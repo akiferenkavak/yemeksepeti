@@ -4,5 +4,31 @@
 
 {% block content %}
 <h2>Hoş geldiniz!</h2>
-<p>Buradan yemek siparişi verebilirsiniz.</p>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="restaurants-container">
+    <h3>Popüler Restoranlar</h3>
+    
+    {% if restaurants %}
+        <div class="restaurant-list">
+            {% for restaurant in restaurants %}
+                <div class="restaurant-card">
+                    <h4>{{ restaurant.restaurant_name }}</h4>
+                    <p>Mutfak: {{ restaurant.cuisine_type }}</p>
+                    <p>Puan: {{ restaurant.rating }}</p>
+                    <a href="#" class="btn btn-primary">Menüyü Gör</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Henüz onaylanmış restoran bulunmamaktadır.</p>
+    {% endif %}
+</div>
 {% endblock %}

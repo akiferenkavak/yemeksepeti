@@ -2,6 +2,7 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
+    background-color: #f8f9fa;
 }
 
 header {
@@ -24,12 +25,209 @@ nav a {
     color: white;
 }
 
+nav .user-greeting {
+    margin-left: 1em;
+    color: white;
+    font-weight: bold;
+    padding: 0.3em 0.7em;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
 main {
     padding: 2em;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 footer {
     text-align: center;
     padding: 1em;
     background-color: #f2f2f2;
+    margin-top: 2em;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 1em;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5em;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.btn {
+    padding: 0.5em 1em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-primary {
+    background-color: #e60000;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* Alert Messages */
+.alert {
+    padding: 1em;
+    margin-bottom: 1em;
+    border-radius: 4px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Auth Container */
+.auth-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 2em;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.auth-container h2 {
+    margin-top: 0;
+    color: #e60000;
+}
+
+.register-options,
+.login-link {
+    margin-top: 2em;
+    text-align: center;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+    margin-top: 1em;
+}
+
+/* Restaurant List */
+.restaurants-container {
+    margin-top: 2em;
+}
+
+.restaurant-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5em;
+    margin-top: 1em;
+}
+
+.restaurant-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 1.5em;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.restaurant-card h4 {
+    margin-top: 0;
+    color: #e60000;
+}
+
+/* Dashboard Styles */
+.admin-dashboard,
+.restaurant-dashboard {
+    background-color: white;
+    border-radius: 8px;
+    padding: 2em;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.admin-menu,
+.restaurant-menu {
+    margin-top: 2em;
+}
+
+.admin-menu ul,
+.restaurant-menu ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.admin-menu li,
+.restaurant-menu li {
+    margin-bottom: 1em;
+}
+
+.admin-menu a,
+.restaurant-menu a {
+    display: block;
+    padding: 1em;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+}
+
+.admin-menu a:hover,
+.restaurant-menu a:hover {
+    background-color: #e9ecef;
+}
+
+.status-pending {
+    color: #856404;
+    background-color: #fff3cd;
+    padding: 1em;
+    border-radius: 4px;
+}
+
+.status-approved {
+    color: #155724;
+    background-color: #d4edda;
+    padding: 1em;
+    border-radius: 4px;
+}
+
+/* For small screens */
+@media (max-width: 768px) {
+    .restaurant-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .button-group {
+        flex-direction: column;
+    }
+    
+    header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    nav {
+        margin-top: 1em;
+    }
+    
+    nav a {
+        margin: 0 0.5em;
+    }
 }

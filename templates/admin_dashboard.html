@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Paneli{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard">
+    <h2>Admin Kontrol Paneli</h2>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="admin-menu">
+        <h3>İşlemler</h3>
+        <ul>
+            <li><a href="#">Restoran Onay İşlemleri</a></li>
+            <li><a href="#">Kullanıcı Yönetimi</a></li>
+            <li><a href="#">Sistem Ayarları</a></li>
+        </ul>
+    </div>
+    
+    <div class="pending-restaurants">
+        <h3>Onay Bekleyen Restoranlar</h3>
+        <!-- Bu kısım daha sonra veritabanından gelecek verilerle doldurulacak -->
+        <p>Henüz onay bekleyen restoran bulunmuyor.</p>
+    </div>
+</div>
+{% endblock %}
