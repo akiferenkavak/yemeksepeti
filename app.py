@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Restaurant
+from models import db, User, Restaurant, Order, OrderItem
+from flask_migrate import Migrate
+
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"  # some security process not much important in our case
@@ -12,9 +14,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///yemeksepeti.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
+# Flask-Migrate'i başlat
+migrate = Migrate(app, db)
+
 # Create tables within app context
 with app.app_context():
     db.create_all()
+
+
 
 
 # Kullanıcı tipi kontrol fonksiyonları //// kimin hangi sayfaya girip giremeyeceğini kontrol eden decoratorlar
@@ -317,6 +324,64 @@ def restaurant_approvals():
             'owner': owner
         })
     return render_template("restaurant_approvals.html", restaurant_data=restaurant_data)
+
+# Admin orders page
+@app.route("/admin/orders", methods=["GET"])
+@login_required
+@admin_required
+def admin_orders():
+    # Get filters from query parameters
+    status_filter = request.args.get('status', 'all')
+    restaurant_id = request.args.get('restaurant_id', 'all')
+    sort_by = request.args.get('sort_by', 'date')
+    sort_dir = request.args.get('sort_dir', 'desc')
+    
+    # Base query
+    orders_query = Order.query
+    
+    # Apply filters
+    if status_filter != 'all':
+        orders_query = orders_query.filter(Order.status == status_filter)
+    
+    if restaurant_id != 'all' and restaurant_id.isdigit():
+        orders_query = orders_query.filter(Order.restaurant_id == int(restaurant_id))
+    
+    # Apply sorting
+    if sort_by == 'date':
+        if sort_dir == 'asc':
+            orders_query = orders_query.order_by(Order.order_date.asc())
+        else:
+            orders_query = orders_query.order_by(Order.order_date.desc())
+    elif sort_by == 'amount':
+        if sort_dir == 'asc':
+            orders_query = orders_query.order_by(Order.total_amount.asc())
+        else:
+            orders_query = orders_query.order_by(Order.total_amount.desc())
+    elif sort_by == 'status':
+        if sort_dir == 'asc':
+            orders_query = orders_query.order_by(Order.status.asc())
+        else:
+            orders_query = orders_query.order_by(Order.status.desc())
+    
+    # Execute query
+    orders = orders_query.all()
+    
+    # Get all restaurants for the filter dropdown
+    restaurants = Restaurant.query.filter_by(is_approved=True).all()
+    
+    # Define possible statuses for filter dropdown
+    statuses = ['pending', 'preparing', 'delivering', 'delivered', 'cancelled']
+    
+    return render_template(
+        "admin_orders.html", 
+        orders=orders, 
+        restaurants=restaurants,
+        statuses=statuses,
+        current_status=status_filter,
+        current_restaurant=restaurant_id,
+        current_sort_by=sort_by,
+        current_sort_dir=sort_dir
+    )
 
 
 if __name__ == "__main__":

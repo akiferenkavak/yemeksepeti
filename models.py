@@ -59,5 +59,35 @@ class MenuItem(db.Model):
     def __repr__(self):
         return f'<Menu Item {self.item_name}>'
     
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
+    order_date = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')  # pending, preparing, delivering, delivered, cancelled
+    total_amount = db.Column(db.Float, nullable=False)
+    delivery_address = db.Column(db.Text, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='orders')
+    restaurant = db.relationship('Restaurant', backref='orders')
+    
+    def __repr__(self):
+        return f'<Order {self.id} - {self.status}>'
+
+class OrderItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    menu_item_id = db.Column(db.Integer, db.ForeignKey('menu_item.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    price = db.Column(db.Float, nullable=False)  # Price at time of order
+    
+    # Relationships
+    order = db.relationship('Order', backref='items')
+    menu_item = db.relationship('MenuItem')
+    
+    def __repr__(self):
+        return f'<OrderItem {self.id} - {self.quantity}x>'
+
 
     
