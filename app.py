@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Restaurant, Order, OrderItem
+from models import db, User, Restaurant, Order, OrderItem, Menu, MenuItem, Cart, CartItem
 from flask_migrate import Migrate
 
 
@@ -73,10 +73,61 @@ def restaurant_dashboard():
     return render_template("restaurant_dashboard.html", restaurant=restaurant)
 
 
-
 @app.route("/")
 def home():
-    return render_template("index.html")
+    # Get query parameters for filtering and sorting
+    cuisine_filter = request.args.get('cuisine', 'all')
+    rating_filter = request.args.get('rating', 'all')
+    sort_by = request.args.get('sort_by', 'rating')
+    sort_dir = request.args.get('sort_dir', 'desc')
+    
+    # Base query - only approved restaurants
+    restaurants_query = Restaurant.query.filter_by(is_approved=True)
+    
+    # Apply filters
+    if cuisine_filter != 'all':
+        restaurants_query = restaurants_query.filter(Restaurant.cuisine_type == cuisine_filter)
+    
+    if rating_filter != 'all' and rating_filter.replace('.', '', 1).isdigit():
+        min_rating = float(rating_filter)
+        restaurants_query = restaurants_query.filter(Restaurant.rating >= min_rating)
+    
+    # Apply sorting
+    if sort_by == 'name':
+        if sort_dir == 'asc':
+            restaurants_query = restaurants_query.order_by(Restaurant.restaurant_name.asc())
+        else:
+            restaurants_query = restaurants_query.order_by(Restaurant.restaurant_name.desc())
+    elif sort_by == 'rating':
+        if sort_dir == 'asc':
+            restaurants_query = restaurants_query.order_by(Restaurant.rating.asc())
+        else:
+            restaurants_query = restaurants_query.order_by(Restaurant.rating.desc())
+    elif sort_by == 'cuisine':
+        if sort_dir == 'asc':
+            restaurants_query = restaurants_query.order_by(Restaurant.cuisine_type.asc())
+        else:
+            restaurants_query = restaurants_query.order_by(Restaurant.cuisine_type.desc())
+    
+    # Execute query
+    restaurants = restaurants_query.all()
+    
+    # Get all unique cuisine types for filter dropdown
+    cuisine_types = db.session.query(Restaurant.cuisine_type).distinct().all()
+    cuisine_types = [cuisine[0] for cuisine in cuisine_types if cuisine[0] is not None]    
+    # Rating options for filter
+    rating_options = ['3.0', '3.5', '4.0', '4.5']
+    
+    return render_template(
+        "index.html", 
+        restaurants=restaurants,
+        cuisine_types=cuisine_types,
+        rating_options=rating_options,
+        current_cuisine=cuisine_filter,
+        current_rating=rating_filter,
+        current_sort_by=sort_by,
+        current_sort_dir=sort_dir
+    )
 
 
 # Giriş sayfası
@@ -383,6 +434,173 @@ def admin_orders():
         current_sort_dir=sort_dir
     )
 
+
+# Restaurant menu display page
+@app.route("/restaurant/<int:restaurant_id>")
+def restaurant_menu(restaurant_id):
+    # Get restaurant information
+    restaurant = Restaurant.query.get_or_404(restaurant_id)
+    
+    # Only show approved restaurants to users
+    if not restaurant.is_approved and ('user_type' not in session or session['user_type'] != 'admin'):
+        flash('Bu restoran henüz onaylanmamıştır.', 'danger')
+        return redirect(url_for('home'))
+    
+    # Get menu items from the restaurant
+    menu_items = Menu.query.filter_by(restaurant_id=restaurant_id, is_available=True).all()
+    
+    return render_template(
+        "restaurant_menu.html",
+        restaurant=restaurant,
+        menu_items=menu_items
+    )
+
+# Add item to cart
+@app.route("/add-to-cart", methods=["POST"])
+@login_required
+def add_to_cart():
+    if session['user_type'] != 'user':
+        flash('Sadece normal kullanıcılar sepete ürün ekleyebilir.', 'danger')
+        return redirect(url_for('home'))
+    
+    menu_item_id = request.form.get('menu_item_id')
+    quantity = int(request.form.get('quantity', 1))
+    
+    # Get the menu item
+    menu_item = MenuItem.query.get_or_404(menu_item_id)
+    restaurant_id = menu_item.menu.restaurant_id
+    
+    # Check if user already has a cart for this restaurant
+    cart = Cart.query.filter_by(user_id=session['user_id'], restaurant_id=restaurant_id).first()
+    
+    # If no cart exists, create one
+    if not cart:
+        cart = Cart(user_id=session['user_id'], restaurant_id=restaurant_id)
+        db.session.add(cart)
+        db.session.flush()
+    
+    # Check if this item is already in the cart
+    cart_item = CartItem.query.filter_by(cart_id=cart.id, menu_item_id=menu_item_id).first()
+    
+    # If item exists, update quantity, otherwise create new cart item
+    if cart_item:
+        cart_item.quantity += quantity
+    else:
+        cart_item = CartItem(cart_id=cart.id, menu_item_id=menu_item_id, quantity=quantity)
+        db.session.add(cart_item)
+    
+    try:
+        db.session.commit()
+        flash(f'{menu_item.item_name} sepete eklendi!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return redirect(url_for('restaurant_menu', restaurant_id=restaurant_id))
+
+# View cart
+@app.route("/cart")
+@login_required
+def view_cart():
+    if session['user_type'] != 'user':
+        flash('Sadece normal kullanıcılar sepeti görüntüleyebilir.', 'danger')
+        return redirect(url_for('home'))
+    
+    # Get user's cart
+    cart = Cart.query.filter_by(user_id=session['user_id']).first()
+    
+    if not cart or not cart.items:
+        return render_template("cart.html", cart=None, items=[], restaurant=None, total=0)
+    
+    # Get cart items with details
+    items = []
+    total = 0
+    
+    for cart_item in cart.items:
+        menu_item = MenuItem.query.get(cart_item.menu_item_id)
+        item_total = menu_item.price * cart_item.quantity
+        total += item_total
+        
+        items.append({
+            'id': cart_item.id,
+            'menu_item': menu_item,
+            'quantity': cart_item.quantity,
+            'item_total': item_total
+        })
+    
+    # Get restaurant info
+    restaurant = Restaurant.query.get(cart.restaurant_id)
+    
+    return render_template("cart.html", cart=cart, items=items, restaurant=restaurant, total=total)
+
+# Update cart item quantity
+@app.route("/cart/update/<int:item_id>", methods=["POST"])
+@login_required
+def update_cart_item(item_id):
+    if session['user_type'] != 'user':
+        flash('Bu işlem için yetkiniz yok.', 'danger')
+        return redirect(url_for('home'))
+    
+    quantity = int(request.form.get('quantity', 1))
+    
+    # Get cart item
+    cart_item = CartItem.query.get_or_404(item_id)
+    
+    # Verify ownership
+    cart = Cart.query.get(cart_item.cart_id)
+    if cart.user_id != session['user_id']:
+        flash('Bu işlem için yetkiniz yok.', 'danger')
+        return redirect(url_for('view_cart'))
+    
+    # Update quantity or remove if quantity is 0
+    if quantity > 0:
+        cart_item.quantity = quantity
+        flash('Sepet güncellendi.', 'success')
+    else:
+        db.session.delete(cart_item)
+        flash('Ürün sepetten çıkarıldı.', 'success')
+    
+    db.session.commit()
+    
+    # Check if cart is empty, delete if it is
+    remaining_items = CartItem.query.filter_by(cart_id=cart.id).count()
+    if remaining_items == 0:
+        db.session.delete(cart)
+        db.session.commit()
+    
+    return redirect(url_for('view_cart'))
+
+# Remove item from cart
+@app.route("/cart/remove/<int:item_id>")
+@login_required
+def remove_cart_item(item_id):
+    if session['user_type'] != 'user':
+        flash('Bu işlem için yetkiniz yok.', 'danger')
+        return redirect(url_for('home'))
+    
+    # Get cart item
+    cart_item = CartItem.query.get_or_404(item_id)
+    
+    # Verify ownership
+    cart = Cart.query.get(cart_item.cart_id)
+    if cart.user_id != session['user_id']:
+        flash('Bu işlem için yetkiniz yok.', 'danger')
+        return redirect(url_for('view_cart'))
+    
+    # Remove the item
+    db.session.delete(cart_item)
+    db.session.commit()
+    
+    # Check if cart is empty, delete if it is
+    remaining_items = CartItem.query.filter_by(cart_id=cart.id).count()
+    if remaining_items == 0:
+        db.session.delete(cart)
+        db.session.commit()
+        flash('Sepetiniz boş.', 'info')
+    else:
+        flash('Ürün sepetten çıkarıldı.', 'success')
+    
+    return redirect(url_for('view_cart'))
 
 if __name__ == "__main__":
     app.run(debug=True)
