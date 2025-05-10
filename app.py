@@ -52,7 +52,9 @@ def restaurant_required(f):
 @login_required
 @admin_required
 def admin_dashboard():
-    return render_template("admin_dashboard.html")
+    # Count pending restaurant approvals
+    pending_count = Restaurant.query.filter_by(is_approved=False).count()
+    return render_template("admin_dashboard.html", pending_count=pending_count)
 
 # Restaurant dashboard page
 @app.route("/restaurant/dashboard")
@@ -265,6 +267,54 @@ def register_admin():
             return redirect(url_for('register_admin'))
     
     return render_template("register_admin.html")
+
+
+
+
+
+# Restaurant approval action (approve/reject)
+@app.route("/admin/restaurant-action/<int:restaurant_id>", methods=["POST"])
+@login_required
+@admin_required
+def restaurant_action(restaurant_id):
+    action = request.form.get('action')
+    restaurant = Restaurant.query.get_or_404(restaurant_id)
+    
+    if action == 'approve':
+        restaurant.is_approved = True
+        db.session.commit()
+        flash(f'{restaurant.restaurant_name} onaylandı!', 'success')
+    elif action == 'reject':
+        # You might want to add a notification system later
+        # For now, let's just remove the restaurant and its owner
+        user_id = restaurant.user_id
+        db.session.delete(restaurant)
+        user = User.query.get(user_id)
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'{restaurant.restaurant_name} reddedildi!', 'danger')
+    
+    return redirect(url_for('restaurant_approvals'))
+
+
+
+
+# Restaurant approval page
+@app.route("/admin/restaurant-approvals", methods=["GET"])
+@login_required
+@admin_required
+def restaurant_approvals():
+    # Get all pending restaurant approvals
+    pending_restaurants = Restaurant.query.filter_by(is_approved=False).all()
+    # Join with user data to get owner information
+    restaurant_data = []
+    for restaurant in pending_restaurants:
+        owner = User.query.get(restaurant.user_id)
+        restaurant_data.append({
+            'restaurant': restaurant,
+            'owner': owner
+        })
+    return render_template("restaurant_approvals.html", restaurant_data=restaurant_data)
 
 
 if __name__ == "__main__":

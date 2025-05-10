@@ -231,3 +231,103 @@ footer {
         margin: 0 0.5em;
     }
 }
+
+/* Approval Table Styles */
+.approval-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1em;
+}
+
+.approval-table th, 
+.approval-table td {
+    padding: 0.75em;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.approval-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.approval-table tr:hover {
+    background-color: #f1f1f1;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5em;
+}
+
+.action-buttons form {
+    display: flex;
+    gap: 0.5em;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.back-link {
+    margin-bottom: 1.5em;
+}
+
+/* Badge for notifications */
+.badge {
+    display: inline-block;
+    min-width: 10px;
+    padding: 3px 7px;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    background-color: #e60000;
+    border-radius: 10px;
+    margin-left: 5px;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+    .approval-table thead {
+        display: none;
+    }
+    
+    .approval-table, 
+    .approval-table tbody, 
+    .approval-table tr, 
+    .approval-table td {
+        display: block;
+        width: 100%;
+    }
+    
+    .approval-table tr {
+        margin-bottom: 1em;
+        border: 1px solid #ddd;
+    }
+    
+    .approval-table td {
+        text-align: right;
+        padding-left: 50%;
+        position: relative;
+    }
+    
+    .approval-table td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: 0;
+        width: 45%;
+        padding-left: 0.75em;
+        font-weight: bold;
+        text-align: left;
+    }
+}
