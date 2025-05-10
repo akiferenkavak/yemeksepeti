@@ -61,7 +61,9 @@ def admin_dashboard():
 @login_required
 @restaurant_required
 def restaurant_dashboard():
-    return render_template("restaurant_dashboard.html")
+    # Giriş yapmış restoranın bilgilerini getir
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    return render_template("restaurant_dashboard.html", restaurant=restaurant)
 
 
 

@@ -16,7 +16,7 @@
     
     <div class="approval-status">
         <!-- Onay durumunu göster -->
-        {% if restaurant.is_approved %}
+        {% if restaurant and restaurant.is_approved %}
             <p class="status-approved">Restoran durumu: Onaylandı</p>
         {% else %}
             <p class="status-pending">Restoran durumu: Onay bekleniyor...</p>
