@@ -16,9 +16,11 @@
     
     <div class="approval-status">
         <!-- Onay durumunu göster -->
-        <p class="status-pending">Restoran durumu: Onay bekleniyor...</p>
-        <!-- veya -->
-        <!-- <p class="status-approved">Restoran durumu: Onaylandı</p> -->
+        {% if restaurant.is_approved %}
+            <p class="status-approved">Restoran durumu: Onaylandı</p>
+        {% else %}
+            <p class="status-pending">Restoran durumu: Onay bekleniyor...</p>
+        {% endif %}
     </div>
     
     <div class="restaurant-menu">
