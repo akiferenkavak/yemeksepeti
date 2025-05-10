@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}YemekSepeti{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1><a href="/">YemekSepeti</a></h1>
+        <nav>
+            <a href="/">Ana Sayfa</a>
+            <!-- Daha sonra login, restoran, ürünler vs. eklersin -->
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 YemekSepeti Clone</p>
+    </footer>
+</body>
+</html>
