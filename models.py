@@ -33,3 +33,31 @@ class Restaurant(db.Model):
     def __repr__(self):
         return f'<Restaurant {self.restaurant_name}>'
     
+class Menu(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
+    item_name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    price = db.Column(db.Float, nullable=False)
+    is_available = db.Column(db.Boolean, default=True)
+    
+    restaurant = db.relationship('Restaurant', backref='menu_items')
+    
+    def __repr__(self):
+        return f'<Menu Item {self.item_name}>'
+    
+class MenuItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    menu_id = db.Column(db.Integer, db.ForeignKey('menu.id'), nullable=False)
+    item_name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    price = db.Column(db.Float, nullable=False)
+    is_available = db.Column(db.Boolean, default=True)
+    
+    menu = db.relationship('Menu', backref='menu_items')
+    
+    def __repr__(self):
+        return f'<Menu Item {self.item_name}>'
+    
+
+    
