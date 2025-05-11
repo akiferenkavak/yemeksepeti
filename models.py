@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 
 db = SQLAlchemy()
 
@@ -11,7 +11,7 @@ class User(db.Model):
     phone = db.Column(db.String(15), nullable=True)
     address = db.Column(db.Text, nullable=True)
     user_type = db.Column(db.String(20), nullable=False)  # 'admin', 'restaurant', 'user'
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     reset_code = db.Column(db.String(100), nullable=True)
     reset_code_expiry = db.Column(db.DateTime, nullable=True)
@@ -30,7 +30,7 @@ class Restaurant(db.Model):
     tax_id = db.Column(db.String(20), unique=True, nullable=False)
     is_approved = db.Column(db.Boolean, default=False)
     rating = db.Column(db.Float, default=0.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     image_path = db.Column(db.String(255), nullable=True, default='default_restaurant.png')
 
     
@@ -67,7 +67,7 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
-    order_date = db.Column(db.DateTime, default=datetime.utcnow)
+    order_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     status = db.Column(db.String(20), default='pending')  # pending, preparing, delivering, delivered, cancelled
     total_amount = db.Column(db.Float, nullable=False)
     delivery_address = db.Column(db.Text, nullable=False)
@@ -94,7 +94,7 @@ class Cart(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user = db.relationship('User', backref='cart')
@@ -116,3 +116,32 @@ class CartItem(db.Model):
     
     def __repr__(self):
         return f'<CartItem {self.id} - {self.quantity}x>'
+
+class RestaurantReview(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)  # 1-5 stars
+    comment = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Relationships
+    user = db.relationship('User', backref='restaurant_reviews')
+    restaurant = db.relationship('Restaurant', backref='reviews')
+    
+    def __repr__(self):
+        return f'<RestaurantReview {self.id} - {self.rating} stars>'
+
+class MenuItemReview(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    menu_id = db.Column(db.Integer, db.ForeignKey('menu.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)  # 1-5 stars
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Relationships
+    user = db.relationship('User', backref='menu_item_reviews')
+    menu_item = db.relationship('Menu', backref='reviews')
+    
+    def __repr__(self):
+        return f'<MenuItemReview {self.id} - {self.rating} stars>'

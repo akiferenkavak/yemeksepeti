@@ -1,16 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Restaurant, Order, OrderItem, Menu, MenuItem, Cart, CartItem
+from models import db, User, Restaurant, Order, OrderItem, Menu, MenuItem, Cart, CartItem, RestaurantReview, MenuItemReview
 from flask_migrate import Migrate
 from flask_mail import Mail, Message
-import datetime
-
-
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"  # some security process not much important in our case
-
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///yemeksepeti.db'
@@ -34,9 +31,6 @@ app.config['MAIL_PASSWORD'] = 'memjgrlmoisojypc'  # Okul projesi için sorun de�
 app.config['MAIL_DEFAULT_SENDER'] = 'yemeksepetieren@yandex.com'
 
 mail = Mail(app)
-
-
-
 
 # Kullanıcı tipi kontrol fonksiyonları //// kimin hangi sayfaya girip giremeyeceğini kontrol eden decoratorlar
 # bizim 3 kullanıcı tipimiz var admin, restaurant ve user
@@ -67,7 +61,6 @@ def restaurant_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-
 # Admin dashboard page
 @app.route("/admin/dashboard")
 @login_required
@@ -85,7 +78,6 @@ def restaurant_dashboard():
     # Giriş yapmış restoranın bilgilerini getir
     restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
     return render_template("restaurant_dashboard.html", restaurant=restaurant)
-
 
 @app.route("/")
 def home():
@@ -143,7 +135,6 @@ def home():
         current_sort_dir=sort_dir
     )
 
-
 # Giriş sayfası
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -174,7 +165,6 @@ def login():
     
     return render_template("login.html")
 
-
 # Çıkış yap
 @app.route("/logout")
 def logout():
@@ -182,8 +172,7 @@ def logout():
     flash('Başarıyla çıkış yaptınız', 'success')
     return redirect(url_for('home'))
 
-
- #Kullanıcı kaydı
+#Kullanıcı kaydı
 @app.route("/register/user", methods=["GET", "POST"])
 def register_user():
     if request.method == "POST":
@@ -342,10 +331,6 @@ def register_admin():
     
     return render_template("register_admin.html")
 
-
-
-
-
 # Restaurant approval action (approve/reject)
 @app.route("/admin/restaurant-action/<int:restaurant_id>", methods=["POST"])
 @login_required
@@ -369,9 +354,6 @@ def restaurant_action(restaurant_id):
         flash(f'{restaurant.restaurant_name} reddedildi!', 'danger')
     
     return redirect(url_for('restaurant_approvals'))
-
-
-
 
 # Restaurant approval page
 @app.route("/admin/restaurant-approvals", methods=["GET"])
@@ -448,7 +430,6 @@ def admin_orders():
         current_sort_dir=sort_dir
     )
 
-
 @app.route("/restaurant/<int:restaurant_id>")
 def restaurant_menu(restaurant_id):
     # Get restaurant information
@@ -461,6 +442,33 @@ def restaurant_menu(restaurant_id):
     
     # Get menu items from the restaurant
     menu_items = Menu.query.filter_by(restaurant_id=restaurant_id, is_available=True).all()
+    
+    # Get restaurant reviews
+    restaurant_reviews = RestaurantReview.query.filter_by(restaurant_id=restaurant_id).order_by(RestaurantReview.created_at.desc()).all()
+    
+    # Get user's existing restaurant review if logged in
+    user_restaurant_review = None
+    if 'logged_in' in session and session['user_type'] == 'user':
+        user_restaurant_review = RestaurantReview.query.filter_by(
+            user_id=session['user_id'],
+            restaurant_id=restaurant_id
+        ).first()
+    
+    # Get user's existing ratings for menu items if logged in
+    user_menu_ratings = {}
+    if 'logged_in' in session and session['user_type'] == 'user':
+        user_ratings = MenuItemReview.query.filter_by(user_id=session['user_id']).all()
+        for rating in user_ratings:
+            user_menu_ratings[rating.menu_id] = rating.rating
+    
+    # Calculate average rating for each menu item
+    for item in menu_items:
+        item_ratings = MenuItemReview.query.filter_by(menu_id=item.id).all()
+        if item_ratings:
+            total_rating = sum(review.rating for review in item_ratings)
+            item.avg_rating = round(total_rating / len(item_ratings), 1)
+        else:
+            item.avg_rating = None
     
     # Get cart info if user is logged in
     cart_items = []
@@ -489,7 +497,10 @@ def restaurant_menu(restaurant_id):
         menu_items=menu_items,
         cart_items=cart_items,
         cart_total=cart_total,
-        cart_count=cart_count
+        cart_count=cart_count,
+        restaurant_reviews=restaurant_reviews,
+        user_restaurant_review=user_restaurant_review,
+        user_menu_ratings=user_menu_ratings
     )
 
 # Add item to cart
@@ -654,8 +665,7 @@ def forgot_password():
             reset_code = ''.join(random.choices(string.digits, k=6))
             
             # Kodun geçerlilik süresini belirle (30 dakika)
-            import datetime
-            expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
+            expiry = datetime.now(timezone.utc) + timedelta(minutes=30)
             
             # Kullanıcının bilgilerini güncelle
             user.reset_code = reset_code
@@ -692,7 +702,7 @@ def verify_reset_code():
         reset_code = request.form.get("reset_code")
         user = User.query.filter_by(email=email, reset_code=reset_code).first()
         
-        if user and user.reset_code_expiry and user.reset_code_expiry > datetime.datetime.utcnow():
+        if user and user.reset_code_expiry and user.reset_code_expiry > datetime.now(timezone.utc):
             # Kod geçerli
             return redirect(url_for("reset_password", email=email, code=reset_code))
         else:
@@ -714,7 +724,7 @@ def reset_password():
     
     user = User.query.filter_by(email=email, reset_code=code).first()
     
-    if not user or not user.reset_code_expiry or user.reset_code_expiry < datetime.datetime.utcnow():
+    if not user or not user.reset_code_expiry or user.reset_code_expiry < datetime.now(timezone.utc):
         flash("Geçersiz veya süresi dolmuş kod.", "danger")
         return redirect(url_for("login"))
     
@@ -948,6 +958,110 @@ def place_order():
     
     flash('Siparişiniz başarıyla alındı!', 'success')
     return redirect(url_for('home'))
+
+# Restoran değerlendirme ekleme route'u
+@app.route("/restaurant/<int:restaurant_id>/review", methods=["POST"])
+@login_required
+def add_restaurant_review(restaurant_id):
+    if session['user_type'] != 'user':
+        flash('Yalnızca müşteriler değerlendirme yapabilir.', 'danger')
+        return redirect(url_for('restaurant_menu', restaurant_id=restaurant_id))
+    
+    rating = int(request.form.get('rating', 0))
+    comment = request.form.get('comment', '')
+    
+    # Validate the rating
+    if rating < 1 or rating > 5:
+        flash('Geçersiz puanlama. Lütfen 1-5 arası bir değer giriniz.', 'danger')
+        return redirect(url_for('restaurant_menu', restaurant_id=restaurant_id))
+    
+    # Check if user already reviewed this restaurant
+    existing_review = RestaurantReview.query.filter_by(
+        user_id=session['user_id'],
+        restaurant_id=restaurant_id
+    ).first()
+    
+    if existing_review:
+        # Update existing review
+        existing_review.rating = rating
+        existing_review.comment = comment
+        existing_review.created_at = datetime.now(timezone.utc)
+        flash('Değerlendirmeniz güncellendi!', 'success')
+    else:
+        # Create new review
+        new_review = RestaurantReview(
+            user_id=session['user_id'],
+            restaurant_id=restaurant_id,
+            rating=rating,
+            comment=comment
+        )
+        db.session.add(new_review)
+        flash('Değerlendirmeniz için teşekkürler!', 'success')
+    
+    # Update restaurant average rating
+    reviews = RestaurantReview.query.filter_by(restaurant_id=restaurant_id).all()
+    if reviews:
+        total_rating = sum(review.rating for review in reviews)
+        avg_rating = total_rating / len(reviews)
+        
+        restaurant = Restaurant.query.get(restaurant_id)
+        restaurant.rating = round(avg_rating, 1)
+    
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return redirect(url_for('restaurant_menu', restaurant_id=restaurant_id))
+
+# Menü öğesi puanlama route'u
+@app.route("/menu-item/<int:item_id>/rate", methods=["POST"])
+@login_required
+def rate_menu_item(item_id):
+    if session['user_type'] != 'user':
+        flash('Yalnızca müşteriler puanlama yapabilir.', 'danger')
+        return redirect(url_for('home'))
+    
+    rating = int(request.form.get('rating', 0))
+    
+    # Validate the rating
+    if rating < 1 or rating > 5:
+        flash('Geçersiz puanlama. Lütfen 1-5 arası bir değer giriniz.', 'danger')
+        return redirect(url_for('home'))
+    
+    # Get the menu item
+    menu_item = Menu.query.get_or_404(item_id)
+    restaurant_id = menu_item.restaurant_id
+    
+    # Check if user already rated this menu item
+    existing_rating = MenuItemReview.query.filter_by(
+        user_id=session['user_id'],
+        menu_id=item_id
+    ).first()
+    
+    if existing_rating:
+        # Update existing rating
+        existing_rating.rating = rating
+        existing_rating.created_at = datetime.now(timezone.utc)
+        flash('Puanlamanız güncellendi!', 'success')
+    else:
+        # Create new rating
+        new_rating = MenuItemReview(
+            user_id=session['user_id'],
+            menu_id=item_id,
+            rating=rating
+        )
+        db.session.add(new_rating)
+        flash('Puanlamanız için teşekkürler!', 'success')
+    
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return redirect(url_for('restaurant_menu', restaurant_id=restaurant_id))
 
 if __name__ == "__main__":
     app.run(debug=True)
