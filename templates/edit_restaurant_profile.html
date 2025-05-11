@@ -49,7 +49,7 @@
                 <div class="mb-3">
                     <label>Mevcut Resim:</label>
                     <div class="mt-2">
-                        <img src="{{ url_for('static', filename=restaurant.image_path) }}" 
+                        <img src="{{ url_for('static', filename='images/restaurants/' + restaurant.image_path) }}" 
                              alt="{{ restaurant.restaurant_name }}" 
                              class="img-thumbnail" style="max-height: 200px;">
                     </div>
