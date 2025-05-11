@@ -74,11 +74,153 @@
     {% endif %}
 </div>
 
+<!-- Floating Cart Notification -->
+<div id="floatingCart" class="floating-cart" {% if cart_items %}style="display: flex;"{% else %}style="display: none;"{% endif %}>
+    <div class="cart-icon">
+        <i class="fas fa-shopping-cart"></i>
+        <span class="cart-count">{{ cart_count }}</span>
+    </div>
+    <div class="cart-preview">
+        <h4>Sepetiniz</h4>
+        <div class="cart-items-preview">
+            {% if cart_items %}
+                {% for item in cart_items %}
+                    <div class="cart-item-preview">
+                        <span class="item-name">{{ item.menu_item.item_name }}</span>
+                        <span class="item-quantity">x{{ item.quantity }}</span>
+                        <span class="item-price">{{ "%.2f"|format(item.item_total) }} TL</span>
+                    </div>
+                {% endfor %}
+                <div class="cart-total-preview">
+                    <strong>Toplam:</strong> {{ "%.2f"|format(cart_total) }} TL
+                </div>
+            {% else %}
+                <p>Sepetiniz boş.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="cart-action">
+        <a href="{{ url_for('view_cart') }}" class="btn btn-sm btn-primary">Sepete Git</a>
+    </div>
+</div>
+
+<style>
+    .floating-cart {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        background-color: white;
+        border-radius: 8px;
+        padding: 10px 15px;
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        animation: slideIn 0.3s ease-out;
+        max-width: 400px;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateY(100px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .cart-icon {
+        display: flex;
+        align-items: center;
+        margin-right: 15px;
+        font-size: 24px;
+        color: #e74c3c;
+    }
+
+    .cart-count {
+        background-color: #e74c3c;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        margin-left: 5px;
+    }
+    
+    .cart-preview {
+        margin-right: 15px;
+        max-width: 250px;
+    }
+    
+    .cart-preview h4 {
+        margin: 0 0 5px 0;
+        font-size: 16px;
+    }
+    
+    .cart-items-preview {
+        font-size: 14px;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    .cart-item-preview {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+    }
+    
+    .item-name {
+        flex: 2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .item-quantity {
+        flex: 1;
+        text-align: center;
+    }
+    
+    .item-price {
+        flex: 1;
+        text-align: right;
+    }
+    
+    .cart-total-preview {
+        margin-top: 5px;
+        text-align: right;
+        font-size: 14px;
+    }
+
+    .cart-action .btn {
+        white-space: nowrap;
+    }
+    
+    @media (max-width: 768px) {
+        .floating-cart {
+            max-width: 280px;
+        }
+        
+        .cart-preview {
+            max-width: 150px;
+        }
+    }
+</style>
+
 <script>
-    // Quantity control buttons
     document.addEventListener('DOMContentLoaded', function() {
         const minusButtons = document.querySelectorAll('.quantity-btn.minus');
         const plusButtons = document.querySelectorAll('.quantity-btn.plus');
+        const addToCartForms = document.querySelectorAll('.add-to-cart form');
+        const floatingCart = document.getElementById('floatingCart');
+        const cartCount = document.querySelector('.cart-count');
         
         minusButtons.forEach(button => {
             button.addEventListener('click', function() {
@@ -98,6 +240,22 @@
                     input.value = value + 1;
                 }
             });
+        });
+        
+        // Show floating cart notification when form is submitted
+        addToCartForms.forEach(form => {
+            form.addEventListener('submit', function() {
+                // We'll let the server handle the cart update
+                // The page will refresh with updated cart info
+            });
+        });
+        
+        // If there's a success flash message about adding to cart, make sure the cart is visible
+        const flashMessages = document.querySelectorAll('.alert-success');
+        flashMessages.forEach(message => {
+            if (message.textContent.includes('sepete eklendi')) {
+                floatingCart.style.display = 'flex';
+            }
         });
     });
 </script>

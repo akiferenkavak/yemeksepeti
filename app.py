@@ -449,7 +449,6 @@ def admin_orders():
     )
 
 
-# Restaurant menu display page
 @app.route("/restaurant/<int:restaurant_id>")
 def restaurant_menu(restaurant_id):
     # Get restaurant information
@@ -463,10 +462,34 @@ def restaurant_menu(restaurant_id):
     # Get menu items from the restaurant
     menu_items = Menu.query.filter_by(restaurant_id=restaurant_id, is_available=True).all()
     
+    # Get cart info if user is logged in
+    cart_items = []
+    cart_total = 0
+    cart_count = 0
+    
+    if 'logged_in' in session and session['user_type'] == 'user':
+        cart = Cart.query.filter_by(user_id=session['user_id'], restaurant_id=restaurant_id).first()
+        if cart:
+            for cart_item in cart.items:
+                menu_item = cart_item.menu_item
+                item_total = menu_item.price * cart_item.quantity
+                cart_total += item_total
+                cart_count += cart_item.quantity
+                
+                cart_items.append({
+                    'id': cart_item.id,
+                    'menu_item': menu_item,
+                    'quantity': cart_item.quantity,
+                    'item_total': item_total
+                })
+    
     return render_template(
         "restaurant_menu.html",
         restaurant=restaurant,
-        menu_items=menu_items
+        menu_items=menu_items,
+        cart_items=cart_items,
+        cart_total=cart_total,
+        cart_count=cart_count
     )
 
 # Add item to cart
@@ -481,8 +504,8 @@ def add_to_cart():
     quantity = int(request.form.get('quantity', 1))
     
     # Get the menu item
-    menu_item = MenuItem.query.get_or_404(menu_item_id)
-    restaurant_id = menu_item.menu.restaurant_id
+    menu_item = Menu.query.get_or_404(menu_item_id)
+    restaurant_id = menu_item.restaurant_id
     
     # Check if user already has a cart for this restaurant
     cart = Cart.query.filter_by(user_id=session['user_id'], restaurant_id=restaurant_id).first()
@@ -493,14 +516,15 @@ def add_to_cart():
         db.session.add(cart)
         db.session.flush()
     
-    # Check if this item is already in the cart
-    cart_item = CartItem.query.filter_by(cart_id=cart.id, menu_item_id=menu_item_id).first()
+    # Use menu_id instead of menu_item_id
+    cart_item = CartItem.query.filter_by(cart_id=cart.id, menu_id=menu_item_id).first()
     
     # If item exists, update quantity, otherwise create new cart item
     if cart_item:
         cart_item.quantity += quantity
     else:
-        cart_item = CartItem(cart_id=cart.id, menu_item_id=menu_item_id, quantity=quantity)
+        # Use menu_id instead of menu_item_id
+        cart_item = CartItem(cart_id=cart.id, menu_id=menu_item_id, quantity=quantity)
         db.session.add(cart_item)
     
     try:
@@ -531,7 +555,7 @@ def view_cart():
     total = 0
     
     for cart_item in cart.items:
-        menu_item = MenuItem.query.get(cart_item.menu_item_id)
+        menu_item = cart_item.menu_item
         item_total = menu_item.price * cart_item.quantity
         total += item_total
         
@@ -839,58 +863,91 @@ def delete_menu_item(item_id):
     
     return redirect(url_for('menu_management'))
 
-
-# Restaurant bilgilerini düzenleme sayfası
-@app.route("/restaurant/edit-profile", methods=["GET", "POST"])
+@app.route("/checkout")
 @login_required
-@restaurant_required
-def edit_restaurant_profile():
-    # Get the restaurant associated with the logged-in user
-    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+def checkout():
+    # Get user's cart
+    cart = Cart.query.filter_by(user_id=session['user_id']).first()
     
-    if not restaurant:
-        flash('Restoran bilgisi bulunamadı', 'danger')
-        return redirect(url_for('restaurant_dashboard'))
+    if not cart or not cart.items:
+        flash('Sepetiniz boş.', 'warning')
+        return redirect(url_for('home'))
     
-    if request.method == "POST":
-        # Get form data
-        restaurant_name = request.form.get('restaurant_name')
-        cuisine_type = request.form.get('cuisine_type')
-        
-        # Update information
-        restaurant.restaurant_name = restaurant_name
-        restaurant.cuisine_type = cuisine_type
-        
-        # Image upload processing (if present)
-        if 'restaurant_image' in request.files:
-            image_file = request.files['restaurant_image']
-            if image_file.filename != '':
-                # Create secure filename
-                import os
-                from werkzeug.utils import secure_filename
-                
-                # Check upload folder and create if doesn't exist
-                # Change to consistent location: static/images/restaurants
-                upload_folder = os.path.join(app.root_path, 'static', 'images', 'restaurants')
-                if not os.path.exists(upload_folder):
-                    os.makedirs(upload_folder)
-                
-                # Create secure filename and save
-                filename = secure_filename(f"restaurant_{restaurant.id}_{image_file.filename}")
-                filepath = os.path.join(upload_folder, filename)
-                image_file.save(filepath)
-                
-                # Update image path in database - store just the filename
-                restaurant.image_path = filename
-        
-        try:
-            db.session.commit()
-            flash('Restoran bilgileri başarıyla güncellendi!', 'success')
-            return redirect(url_for('restaurant_dashboard'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    # Get cart items with details
+    items = []
+    total = 0
     
-    return render_template("edit_restaurant_profile.html", restaurant=restaurant)
+    for cart_item in cart.items:
+        menu_item = cart_item.menu_item
+        item_total = menu_item.price * cart_item.quantity
+        total += item_total
+        
+        items.append({
+            'id': cart_item.id,
+            'menu_item': menu_item,
+            'quantity': cart_item.quantity,
+            'item_total': item_total
+        })
+    
+    # Get restaurant info
+    restaurant = Restaurant.query.get(cart.restaurant_id)
+    
+    return render_template("checkout.html", cart=cart, items=items, restaurant=restaurant, total=total)
+
+@app.route("/place-order", methods=["POST"])
+@login_required
+def place_order():
+    # Get user's cart
+    cart = Cart.query.filter_by(user_id=session['user_id']).first()
+    
+    if not cart or not cart.items:
+        flash('Sepetiniz boş.', 'warning')
+        return redirect(url_for('home'))
+    
+    # Get delivery address and payment method
+    delivery_address = request.form.get('address')
+    payment_method = request.form.get('payment_method')
+    notes = request.form.get('notes', '')
+    
+    # Calculate total
+    total = 0
+    for cart_item in cart.items:
+        menu_item = cart_item.menu_item
+        total += menu_item.price * cart_item.quantity
+    
+    # Create order
+    new_order = Order(
+        user_id=session['user_id'],
+        restaurant_id=cart.restaurant_id,
+        total_amount=total,
+        delivery_address=delivery_address,
+        status='pending'
+    )
+    
+    db.session.add(new_order)
+    db.session.flush()  # Get the new order ID
+    
+    # Create order items
+    for cart_item in cart.items:
+        menu_item = cart_item.menu_item
+        order_item = OrderItem(
+            order_id=new_order.id,
+            menu_id=cart_item.menu_id,  # Use menu_id instead of menu_item_id
+            quantity=cart_item.quantity,
+            price=menu_item.price
+        )
+        db.session.add(order_item)
+    
+    # Delete cart and items
+    cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+    for item in cart_items:
+        db.session.delete(item)
+    
+    db.session.delete(cart)
+    db.session.commit()
+    
+    flash('Siparişiniz başarıyla alındı!', 'success')
+    return redirect(url_for('home'))
+
 if __name__ == "__main__":
     app.run(debug=True)
