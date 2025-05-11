@@ -31,7 +31,8 @@ class Restaurant(db.Model):
     is_approved = db.Column(db.Boolean, default=False)
     rating = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    image_path = db.Column(db.String(255), nullable=True, default='default.jpg')
+    image_path = db.Column(db.String(255), nullable=True, default='default_restaurant.png')
+
     
     def __repr__(self):
         return f'<Restaurant {self.restaurant_name}>'
@@ -81,17 +82,13 @@ class Order(db.Model):
 class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
-    menu_item_id = db.Column(db.Integer, db.ForeignKey('menu_item.id'), nullable=False)
+    menu_id = db.Column(db.Integer, db.ForeignKey('menu.id'), nullable=False)  # Changed from menu_item_id
     quantity = db.Column(db.Integer, nullable=False)
-    price = db.Column(db.Float, nullable=False)  # Price at time of order
+    price = db.Column(db.Float, nullable=False)
     
     # Relationships
     order = db.relationship('Order', backref='items')
-    menu_item = db.relationship('MenuItem')
-    
-    def __repr__(self):
-        return f'<OrderItem {self.id} - {self.quantity}x>'
-
+    menu_item = db.relationship('Menu')  # Changed from MenuItem to Menu
 
 class Cart(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -106,15 +103,16 @@ class Cart(db.Model):
     def __repr__(self):
         return f'<Cart {self.id} - User {self.user_id}>'
 
+# In models.py
 class CartItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     cart_id = db.Column(db.Integer, db.ForeignKey('cart.id'), nullable=False)
-    menu_item_id = db.Column(db.Integer, db.ForeignKey('menu_item.id'), nullable=False)
+    menu_id = db.Column(db.Integer, db.ForeignKey('menu.id'), nullable=False)  # This should match your actual column name
     quantity = db.Column(db.Integer, nullable=False, default=1)
     
     # Relationships
     cart = db.relationship('Cart', backref='items')
-    menu_item = db.relationship('MenuItem')
+    menu_item = db.relationship('Menu')
     
     def __repr__(self):
         return f'<CartItem {self.id} - {self.quantity}x>'
