@@ -839,5 +839,58 @@ def delete_menu_item(item_id):
     
     return redirect(url_for('menu_management'))
 
+
+# Restaurant bilgilerini düzenleme sayfası
+@app.route("/restaurant/edit-profile", methods=["GET", "POST"])
+@login_required
+@restaurant_required
+def edit_restaurant_profile():
+    # Giriş yapmış kullanıcı ile ilişkili restoranı al
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    
+    if not restaurant:
+        flash('Restoran bilgisi bulunamadı', 'danger')
+        return redirect(url_for('restaurant_dashboard'))
+    
+    if request.method == "POST":
+        # Form verilerini al
+        restaurant_name = request.form.get('restaurant_name')
+        cuisine_type = request.form.get('cuisine_type')
+        
+        # Bilgileri güncelle
+        restaurant.restaurant_name = restaurant_name
+        restaurant.cuisine_type = cuisine_type
+        
+        # Resim yükleme işlemi (eğer varsa)
+        if 'restaurant_image' in request.files:
+            image_file = request.files['restaurant_image']
+            if image_file.filename != '':
+                # Güvenli dosya adı oluştur
+                import os
+                from werkzeug.utils import secure_filename
+                
+                # Yükleme klasörü kontrolü
+                upload_folder = os.path.join(app.root_path, 'static', 'restaurant_images')
+                if not os.path.exists(upload_folder):
+                    os.makedirs(upload_folder)
+                
+                # Dosya adını güvenli hale getir ve kaydet
+                filename = secure_filename(f"restaurant_{restaurant.id}_{image_file.filename}")
+                filepath = os.path.join(upload_folder, filename)
+                image_file.save(filepath)
+                
+                # Veritabanında resim yolunu güncelle
+                restaurant.image_path = f'restaurant_images/{filename}'
+        
+        try:
+            db.session.commit()
+            flash('Restoran bilgileri başarıyla güncellendi!', 'success')
+            return redirect(url_for('restaurant_dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return render_template("edit_restaurant_profile.html", restaurant=restaurant)
+
 if __name__ == "__main__":
     app.run(debug=True)
