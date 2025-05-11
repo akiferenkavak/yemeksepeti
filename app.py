@@ -3,6 +3,9 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Restaurant, Order, OrderItem, Menu, MenuItem, Cart, CartItem
 from flask_migrate import Migrate
+from flask_mail import Mail, Message
+import datetime
+
 
 
 app = Flask(__name__)
@@ -20,6 +23,17 @@ migrate = Migrate(app, db)
 # Create tables within app context
 with app.app_context():
     db.create_all()
+
+# Mail ayarları
+app.config['MAIL_SERVER'] = 'smtp.yandex.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True  # SSL kullanılmalı
+app.config['MAIL_USE_TLS'] = False  # TLS kullanılmamalı
+app.config['MAIL_USERNAME'] = 'yemeksepetieren@yandex.com'
+app.config['MAIL_PASSWORD'] = 'memjgrlmoisojypc'  # Okul projesi için sorun değil
+app.config['MAIL_DEFAULT_SENDER'] = 'yemeksepetieren@yandex.com'
+
+mail = Mail(app)
 
 
 
@@ -601,6 +615,103 @@ def remove_cart_item(item_id):
         flash('Ürün sepetten çıkarıldı.', 'success')
     
     return redirect(url_for('view_cart'))
+
+#şifre unutma route'u
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email")
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            # Rastgele 6 haneli bir kod oluştur
+            import random
+            import string
+            reset_code = ''.join(random.choices(string.digits, k=6))
+            
+            # Kodun geçerlilik süresini belirle (30 dakika)
+            import datetime
+            expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
+            
+            # Kullanıcının bilgilerini güncelle
+            user.reset_code = reset_code
+            user.reset_code_expiry = expiry
+            db.session.commit()
+            
+            # E-posta gönder
+            try:
+                msg = Message("Şifre Sıfırlama", recipients=[email])
+                msg.body = f"Şifre sıfırlama kodunuz: {reset_code}\nBu kod 30 dakika boyunca geçerlidir."
+                mail.send(msg)
+                flash("Şifre sıfırlama kodu e-posta adresinize gönderildi.", "success")
+                return redirect(url_for("verify_reset_code", email=email))
+            except Exception as e:
+                db.session.rollback()  # Kod kaydını geri al
+                flash(f"E-posta gönderilirken bir hata oluştu: {str(e)}", "danger")
+                return redirect(url_for("forgot_password"))
+        else:
+            flash("Bu e-posta adresi ile kayıtlı bir hesap bulunamadı.", "danger")
+    
+    return render_template("forgot_password.html")
+
+
+# Şifre sıfırlama kodunu doğrulama
+@app.route("/verify-reset-code", methods=["GET", "POST"])
+def verify_reset_code():
+    email = request.args.get("email")
+    
+    if not email:
+        flash("Geçersiz istek.", "danger")
+        return redirect(url_for("login"))
+    
+    if request.method == "POST":
+        reset_code = request.form.get("reset_code")
+        user = User.query.filter_by(email=email, reset_code=reset_code).first()
+        
+        if user and user.reset_code_expiry and user.reset_code_expiry > datetime.datetime.utcnow():
+            # Kod geçerli
+            return redirect(url_for("reset_password", email=email, code=reset_code))
+        else:
+            flash("Geçersiz veya süresi dolmuş kod.", "danger")
+    
+    return render_template("verify_reset_code.html", email=email)
+
+
+
+# Şifre sıfırlama
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    email = request.args.get("email")
+    code = request.args.get("code")
+    
+    if not email or not code:
+        flash("Geçersiz istek.", "danger")
+        return redirect(url_for("login"))
+    
+    user = User.query.filter_by(email=email, reset_code=code).first()
+    
+    if not user or not user.reset_code_expiry or user.reset_code_expiry < datetime.datetime.utcnow():
+        flash("Geçersiz veya süresi dolmuş kod.", "danger")
+        return redirect(url_for("login"))
+    
+    if request.method == "POST":
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        
+        if password != confirm_password:
+            flash("Şifreler eşleşmiyor.", "danger")
+        else:
+            # Şifreyi güncelle
+            hashed_password = generate_password_hash(password)
+            user.password = hashed_password
+            user.reset_code = None
+            user.reset_code_expiry = None
+            db.session.commit()
+            
+            flash("Şifreniz başarıyla değiştirildi. Yeni şifrenizle giriş yapabilirsiniz.", "success")
+            return redirect(url_for("login"))
+    
+    return render_template("reset_password.html", email=email, code=code)
 
 if __name__ == "__main__":
     app.run(debug=True)

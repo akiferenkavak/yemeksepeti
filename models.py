@@ -13,6 +13,8 @@ class User(db.Model):
     user_type = db.Column(db.String(20), nullable=False)  # 'admin', 'restaurant', 'user'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
+    reset_code = db.Column(db.String(100), nullable=True)
+    reset_code_expiry = db.Column(db.DateTime, nullable=True)
     
     # Relationship with Restaurant for restaurant owners
     restaurant = db.relationship('Restaurant', backref='owner', uselist=False)
