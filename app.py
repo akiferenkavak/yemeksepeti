@@ -602,5 +602,129 @@ def remove_cart_item(item_id):
     
     return redirect(url_for('view_cart'))
 
+# Menu Management Routes to add to app.py
+
+# Restaurant menu management page
+@app.route("/restaurant/menu-management")
+@login_required
+@restaurant_required
+def menu_management():
+    # Get the restaurant associated with the logged-in user
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    
+    if not restaurant:
+        flash('Restoran bilgisi bulunamadı', 'danger')
+        return redirect(url_for('restaurant_dashboard'))
+    
+    # Get all menu items for this restaurant
+    menu_items = Menu.query.filter_by(restaurant_id=restaurant.id).all()
+    
+    return render_template("menu_management.html", restaurant=restaurant, menu_items=menu_items)
+
+# Add new menu item
+@app.route("/restaurant/add-menu-item", methods=["POST"])
+@login_required
+@restaurant_required
+def add_menu_item():
+    # Get the restaurant associated with the logged-in user
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    
+    if not restaurant:
+        flash('Restoran bilgisi bulunamadı', 'danger')
+        return redirect(url_for('restaurant_dashboard'))
+    
+    # Get form data
+    item_name = request.form.get('item_name')
+    description = request.form.get('description')
+    price = request.form.get('price')
+    is_available = request.form.get('is_available') == 'True'
+    
+    # Create new menu item
+    menu_item = Menu(
+        restaurant_id=restaurant.id,
+        item_name=item_name,
+        description=description,
+        price=float(price),
+        is_available=is_available
+    )
+    
+    try:
+        db.session.add(menu_item)
+        db.session.commit()
+        flash(f'{item_name} başarıyla eklendi!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return redirect(url_for('menu_management'))
+
+# Edit menu item page
+@app.route("/restaurant/edit-menu-item/<int:item_id>", methods=["GET", "POST"])
+@login_required
+@restaurant_required
+def edit_menu_item(item_id):
+    # Get the restaurant associated with the logged-in user
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    
+    if not restaurant:
+        flash('Restoran bilgisi bulunamadı', 'danger')
+        return redirect(url_for('restaurant_dashboard'))
+    
+    # Get the menu item
+    menu_item = Menu.query.get_or_404(item_id)
+    
+    # Verify that this menu item belongs to the logged-in restaurant
+    if menu_item.restaurant_id != restaurant.id:
+        flash('Bu işlem için yetkiniz yok', 'danger')
+        return redirect(url_for('menu_management'))
+    
+    if request.method == "POST":
+        # Update the menu item with new values
+        menu_item.item_name = request.form.get('item_name')
+        menu_item.description = request.form.get('description')
+        menu_item.price = float(request.form.get('price'))
+        menu_item.is_available = request.form.get('is_available') == 'True'
+        
+        try:
+            db.session.commit()
+            flash(f'{menu_item.item_name} başarıyla güncellendi!', 'success')
+            return redirect(url_for('menu_management'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return render_template("edit_menu_item.html", menu_item=menu_item)
+
+# Delete menu item
+@app.route("/restaurant/delete-menu-item/<int:item_id>", methods=["POST"])
+@login_required
+@restaurant_required
+def delete_menu_item(item_id):
+    # Get the restaurant associated with the logged-in user
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    
+    if not restaurant:
+        flash('Restoran bilgisi bulunamadı', 'danger')
+        return redirect(url_for('restaurant_dashboard'))
+    
+    # Get the menu item
+    menu_item = Menu.query.get_or_404(item_id)
+    
+    # Verify that this menu item belongs to the logged-in restaurant
+    if menu_item.restaurant_id != restaurant.id:
+        flash('Bu işlem için yetkiniz yok', 'danger')
+        return redirect(url_for('menu_management'))
+    
+    try:
+        item_name = menu_item.item_name
+        db.session.delete(menu_item)
+        db.session.commit()
+        flash(f'{item_name} başarıyla silindi!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return redirect(url_for('menu_management'))
+
 if __name__ == "__main__":
     app.run(debug=True)
