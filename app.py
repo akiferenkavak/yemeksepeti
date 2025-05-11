@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Restaurant, Order, OrderItem, Menu, MenuItem, Cart, CartItem, RestaurantReview, MenuItemReview
 from flask_migrate import Migrate
 from flask_mail import Mail, Message
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"  # some security process not much important in our case
@@ -1062,6 +1062,59 @@ def rate_menu_item(item_id):
         flash(f'Bir hata oluştu: {str(e)}', 'danger')
     
     return redirect(url_for('restaurant_menu', restaurant_id=restaurant_id))
+
+# Restaurant bilgilerini düzenleme sayfası
+@app.route("/restaurant/edit-profile", methods=["GET", "POST"])
+@login_required
+@restaurant_required
+def edit_restaurant_profile():
+    # Get the restaurant associated with the logged-in user
+    restaurant = Restaurant.query.filter_by(user_id=session['user_id']).first()
+    
+    if not restaurant:
+        flash('Restoran bilgisi bulunamadı', 'danger')
+        return redirect(url_for('restaurant_dashboard'))
+    
+    if request.method == "POST":
+        # Get form data
+        restaurant_name = request.form.get('restaurant_name')
+        cuisine_type = request.form.get('cuisine_type')
+        
+        # Update information
+        restaurant.restaurant_name = restaurant_name
+        restaurant.cuisine_type = cuisine_type
+        
+        # Image upload processing (if present)
+        if 'restaurant_image' in request.files:
+            image_file = request.files['restaurant_image']
+            if image_file.filename != '':
+                # Create secure filename
+                import os
+                from werkzeug.utils import secure_filename
+                
+                # Check upload folder and create if doesn't exist
+                # Change to consistent location: static/images/restaurants
+                upload_folder = os.path.join(app.root_path, 'static', 'images', 'restaurants')
+                if not os.path.exists(upload_folder):
+                    os.makedirs(upload_folder)
+                
+                # Create secure filename and save
+                filename = secure_filename(f"restaurant_{restaurant.id}_{image_file.filename}")
+                filepath = os.path.join(upload_folder, filename)
+                image_file.save(filepath)
+                
+                # Update image path in database - store just the filename
+                restaurant.image_path = filename
+        
+        try:
+            db.session.commit()
+            flash('Restoran bilgileri başarıyla güncellendi!', 'success')
+            return redirect(url_for('restaurant_dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Bir hata oluştu: {str(e)}', 'danger')
+    
+    return render_template("edit_restaurant_profile.html", restaurant=restaurant)
 
 if __name__ == "__main__":
     app.run(debug=True)
