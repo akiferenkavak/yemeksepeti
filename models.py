@@ -31,8 +31,7 @@ class Restaurant(db.Model):
     is_approved = db.Column(db.Boolean, default=False)
     rating = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    image_path = db.Column(db.String(255), nullable=True, default='default_restaurant.png')
-
+    image_path = db.Column(db.String(255), nullable=True, default='default.jpg')
     
     def __repr__(self):
         return f'<Restaurant {self.restaurant_name}>'
